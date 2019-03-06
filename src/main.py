@@ -17,10 +17,10 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import datasets, transforms
 from tqdm import trange
 
-import utils
-from sampler import InfiniteSamplerWrapper
-from transformer_net import TransformerNet
-from vgg import Vgg16
+import src.utils as utils
+from src.sampler import InfiniteSamplerWrapper
+from src.transformer_net import TransformerNet
+from src.vgg import Vgg16
 
 # from PIL import Image
 # from PIL import ImageFile
@@ -40,7 +40,7 @@ def check_paths(args):
         if args.checkpoint_model_dir is not None and not (os.path.exists(args.checkpoint_model_dir)):
             os.makedirs(args.checkpoint_model_dir)
     except OSError as e:
-        print e
+        print(e)
         sys.exit(1)
 
 
@@ -72,11 +72,11 @@ def get_data_loader(args):
     content_dataset = datasets.ImageFolder(args.content_dataset, content_transform)
     style_dataset = datasets.ImageFolder(args.style_dataset, style_transform)
 
-    content_loader = DataLoader(content_dataset, 
-                                batch_size=args.iter_batch_size, 
+    content_loader = DataLoader(content_dataset,
+                                batch_size=args.iter_batch_size,
                                 sampler=InfiniteSamplerWrapper(content_dataset),
                                 num_workers=args.n_workers)
-    style_loader = DataLoader(style_dataset, batch_size=1, 
+    style_loader = DataLoader(style_dataset, batch_size=1,
                               sampler=InfiniteSamplerWrapper(style_dataset),
                               num_workers=args.n_workers)
     query_loader = DataLoader(content_dataset,
@@ -101,7 +101,7 @@ def meta_updates(model, dummy_loss, all_meta_grads):
     dummy_loss.backward()
     optimizer.step()
     for h in hooks:
-        h.remove()    
+        h.remove()
 
 
 def train(args):
@@ -132,7 +132,6 @@ def train(args):
 
     for iteration in trange(args.max_iter):
         transformer.train()
-        
         # bookkeeping
         # using state_dict causes problems, use named_parameters instead
         all_meta_grads = []
@@ -175,25 +174,25 @@ def train(args):
 
                 # update fast weights
                 fast_weights = OrderedDict((name, param - lr * grad) for ((name, param), grad) in zip(fast_weights.items(), grads))
-            
+
             avg_train_c_loss += c_loss.item()
             avg_train_s_loss += s_loss.item()
             avg_train_loss += loss.item()
 
             # run forward transformation on querys
             transformed = transformer(querys, fast_weights)
-            
+
             # compute loss
             features_transformed = vgg(utils.standardize_batch(transformed))
             loss, c_loss, s_loss = loss_fn(features_transformed, features_querys, gram_style, content_weight, style_weight)
-            
+
             grads = torch.autograd.grad(loss / args.meta_batch_size, transformer.parameters())
             all_meta_grads.append({name: g for ((name, _), g) in zip(transformer.named_parameters(), grads)})
 
             avg_eval_c_loss += c_loss.item()
             avg_eval_s_loss += s_loss.item()
             avg_eval_loss += loss.item()
-        
+
         writer.add_scalar("Avg_Train_C_Loss", avg_train_c_loss / args.meta_batch_size, iteration + 1)
         writer.add_scalar("Avg_Train_S_Loss", avg_train_s_loss / args.meta_batch_size, iteration + 1)
         writer.add_scalar("Avg_Train_Loss", avg_train_loss / args.meta_batch_size, iteration + 1)
@@ -228,7 +227,7 @@ def train(args):
     save_model_path = os.path.join(args.save_model_dir, save_model_filename)
     torch.save(transformer.state_dict(), save_model_path)
 
-    print "Done, trained model saved at {}".format(save_model_path)
+    print("Done, trained model saved at {}".format(save_model_path))
 
 
 def fast_train(args):
@@ -253,8 +252,8 @@ def fast_train(args):
         transforms.ToTensor(),
         transforms.Lambda(lambda x: x.mul(255))])
     content_dataset = datasets.ImageFolder(args.content_dataset, content_transform)
-    content_loader = DataLoader(content_dataset, 
-                                batch_size=args.iter_batch_size, 
+    content_loader = DataLoader(content_dataset,
+                                batch_size=args.iter_batch_size,
                                 sampler=InfiniteSamplerWrapper(content_dataset),
                                 num_workers=args.n_workers)
     content_loader = iter(content_loader)
@@ -322,7 +321,7 @@ def main():
 
     train_arg_parser = subparsers.add_parser("train", help="parser for training")
     train_arg_parser.add_argument("--max-iter", type=int, default=100000,
-                                  help="number of training iterations, large enough to traverse the style " 
+                                  help="number of training iterations, large enough to traverse the style "
                                        "dataset for several epochs")
     train_arg_parser.add_argument("--iter-batch-size", type=int, default=4,
                                   help="batch size for each style training iteration")
@@ -392,7 +391,7 @@ def main():
                                   help="path to folder where trained model will be saved.")
     fast_arg_parser.add_argument("--only-in", type=int, default=0,
                                  help="update IN layers only if set to 1")
-    
+
     test_arg_parser = subparsers.add_parser("test", help="parser for testing")
     test_arg_parser.add_argument("--content-image", type=str, required=True,
                                  help="path to content image you want to stylize")
@@ -408,10 +407,10 @@ def main():
     args = main_arg_parser.parse_args()
 
     if args.subcommand is None:
-        print "ERROR: specify either train or fast train"
+        print("ERROR: specify either train or fast train")
         sys.exit(1)
     if args.cuda and not torch.cuda.is_available():
-        print "ERROR: cuda is not available, try running on CPU"
+        print("ERROR: cuda is not available, try running on CPU")
         sys.exit(1)
 
     if args.subcommand == "train":
